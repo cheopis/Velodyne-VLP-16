@@ -9,7 +9,6 @@ import os
 import sys
 import vtk
 from numpy import random
-import cv2
 from numpy import linalg
 import copy
 import matplotlib.pyplot as plt
@@ -52,7 +51,7 @@ class VtkPointCloud:
         self.vtkPolyData.GetCellData().SetScalars(self.vtkDepth)
         self.vtkPolyData.GetCellData().SetActiveScalars('DepthArray')
         point_mapper = vtk.vtkPolyDataMapper()
-        point_mapper.SetInput(self.vtkPolyData)
+        point_mapper.SetInputData(self.vtkPolyData)
         point_mapper.SetColorModeToDefault()
         point_mapper.SetScalarRange(zMin, zMax)
         self.point_vtkActor = vtk.vtkActor()
@@ -61,7 +60,7 @@ class VtkPointCloud:
     def init_planes(self):
         self.vtkPlanes = vtk.vtkPlaneSource()
         plane_mapper = vtk.vtkPolyDataMapper()
-        plane_mapper.SetInput(self.vtkPlanes.GetOutput())
+        plane_mapper.SetInputData(self.vtkPlanes.GetOutput())
         self.plane_vtkActor = vtk.vtkActor()
         self.plane_vtkActor.SetMapper(plane_mapper)
 
@@ -91,18 +90,28 @@ def vtk_visualize(point_list, view_thresh):
     for i in range(len(point_list)):
         point_coords = point_list[i]
 
+        intensity = point_coords[3]
+
         if (point_coords[0] > x_thresh[0]) and (point_coords[0] < x_thresh[1]) and \
                 (point_coords[1] > y_thresh[0]) and (point_coords[1] < y_thresh[1]) and \
                 (point_coords[2] > z_thresh[0]) and (point_coords[2] < z_thresh[1]):
-            color_num = 0.7
+            #color_num = 0.1
+            pass
         else:
-            color_num = -1
-        point_cloud.addPoint(point_list[i], color_num)
+            #color_num = -.8
+            pass
+
+        #Map intensity into a -1 to 1 scale from 0 to 255 scale
+        #Least intense color is blue. Most intense is red. To switch this,
+        #negate color_num
+        color_num = -(((intensity * 2) - 255)/255.0)
+
+        point_cloud.addPoint(point_list[i][:3], color_num)
 
     # Add the velodyne plane
     for x in np.linspace(-4, 4, 100):
         for y in np.linspace(0, 2, 25):
-            tmp_coords = np.array([x, 0, y])
+            tmp_coords = np.array([x, y, 0])
             point_cloud.addPoint(tmp_coords, 1)
     # Add the floor plane
     plane_center = (-4, -4, -0.55)
@@ -115,13 +124,15 @@ def vtk_visualize(point_list, view_thresh):
     renderer = vtk.vtkRenderer()
     renderer.AddActor(point_cloud.point_vtkActor)
     renderer.AddActor(point_cloud.plane_vtkActor)
-
     renderer.SetBackground(0.0, 0.0, 0.0)
     renderer.ResetCamera()
+    renderer.GetActiveCamera().SetPosition(10, 10, 3)
+    
 
     # Render Window
     render_window = vtk.vtkRenderWindow()
     render_window.AddRenderer(renderer)
+    render_window.SetSize(640,480)
 
     # Interactor
     render_window_interactor = vtk.vtkRenderWindowInteractor()
@@ -138,7 +149,7 @@ def vtk_visualize(point_list, view_thresh):
     widget.SetEnabled(1)
     widget.InteractiveOn()
     render_window.Render()
-    render_window_interactor.Start()
+    render_window_interactor.Start()    
 
 
 def load_data(point_cloud_path):
@@ -168,7 +179,8 @@ def load_data(point_cloud_path):
             data = f.readline()
             if not data:
                 break
-            point_coords = np.float64(data.strip().split(',')[:3])
+            #Get intensity data as well
+            point_coords = np.float64(data.strip().split(',')[:4])
             all_point_list.append(point_coords)
             if (point_coords[0] > x_thresh[0]) and (point_coords[0] < x_thresh[1]) and \
                     (point_coords[1] > y_thresh[0]) and (point_coords[1] < y_thresh[1]) and \
@@ -187,6 +199,6 @@ def main(point_cloud_path):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print __doc__
+        print(__doc__)
         sys.exit(2)
     main(sys.argv[1])
